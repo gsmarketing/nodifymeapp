@@ -1,8 +1,8 @@
-# NodifyMe Agent
+# Nodify.Me Agent
 
 > **Monitoring agent for Node.js applications and Docker containers**
 
-NodifyMe Agent is a lightweight monitoring daemon that runs on your servers to collect system metrics and detect Node.js applications (Next.js, Nest.js, Vite) and Docker containers.
+Nodify.Me Agent is a lightweight monitoring daemon that runs on your servers to collect system metrics and detect Node.js applications (Next.js, Nest.js, Vite) and Docker containers.
 
 ## Quick Installation
 
@@ -22,13 +22,13 @@ curl -fsSL https://raw.githubusercontent.com/gsmarketing/nodifymeapp/main/instal
 - **Linux Server** (Ubuntu 18.04+, CentOS 7+, Amazon Linux 2+)
 - **Architecture** (amd64 or arm64)
 - **Root/sudo access** for installation
-- **Network access** to download binaries and communicate with your NodifyMe app
+- **Network access** to download binaries and communicate with your Nodify.Me app
 
 ## Parameters
 
 | Parameter | Required | Description | Example |
 |-----------|----------|-------------|---------|
-| `--api-url` | ✅ | URL of your NodifyMe application | `https://app.nodifyme.com` |
+| `--api-url` | ✅ | URL of your Nodify.Me application | `https://app.nodifyme.com` |
 | `--token` | ✅ | Agent authentication token (min 16 chars) | `eyJ0eXAiOiJKV1QiLCJhbGc...` |
 | `--version` | ❌ | Specific agent version to install | `v1.0.0` (default: `latest`) |
 
@@ -154,12 +154,12 @@ sudo chown -R nodifyme:nodifyme /var/log/nodifyme/
 If you encounter issues:
 1. Check the [troubleshooting guide](docs/troubleshooting.md)
 2. Review the [manual installation guide](docs/manual-install.md)
-3. Check your NodifyMe application logs
+3. Check your Nodify.Me application logs
 4. Verify your server meets the requirements
 
 ## Architecture
 
-The NodifyMe Agent is designed for:
+The Nodify.Me Agent is designed for:
 - **Minimal Resource Usage** - Low CPU and memory footprint
 - **Security First** - Secure by default with minimal attack surface
 - **Easy Deployment** - One-command installation and configuration
@@ -167,8 +167,8 @@ The NodifyMe Agent is designed for:
 
 ## License
 
-Copyright © 2024 NodifyMe. All rights reserved.
+Copyright © 2024 Nodify.Me. All rights reserved.
 
 ---
 
-*NodifyMe Agent - Monitoring made simple* 🚀
+*Nodify.Me Agent - Monitoring made simple* 🚀

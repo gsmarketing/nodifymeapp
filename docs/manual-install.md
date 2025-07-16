@@ -1,6 +1,6 @@
 # Manual Installation Guide
 
-> **Technical user guide for manual NodifyMe Agent installation**
+> **Technical user guide for manual Nodify.Me Agent installation**
 
 This guide is for system administrators and technical users who want more control over the installation process.
 
@@ -9,7 +9,7 @@ This guide is for system administrators and technical users who want more contro
 - Linux server (Ubuntu 18.04+, CentOS 7+, Amazon Linux 2+)
 - Root or sudo access
 - `curl` and `systemctl` available
-- Network access to GitHub and your NodifyMe application
+- Network access to GitHub and your Nodify.Me application
 
 ## Step-by-Step Installation
 
@@ -28,8 +28,8 @@ less install.sh
 
 ### 2. Obtain Agent Token
 
-Get your agent token from your NodifyMe application:
-- Log in to your NodifyMe app
+Get your agent token from your Nodify.Me application:
+- Log in to your Nodify.Me app
 - Go to Settings → Servers → Add Server
 - Generate or copy the agent token
 
@@ -88,7 +88,7 @@ sudo -E ./install.sh --api-url YOUR_URL --token YOUR_TOKEN
 ### Main Configuration (`/etc/nodifyme/config.yaml`)
 
 ```yaml
-# NodifyMe Agent Configuration
+# Nodify.Me Agent Configuration
 api:
   url: "https://your-app.com"
   timeout: 30s
@@ -124,7 +124,7 @@ AGENT_AUTH_TOKEN=your-secure-token-here
 
 ```ini
 [Unit]
-Description=NodifyMe Monitoring Agent
+Description=Nodify.Me Monitoring Agent
 Documentation=https://github.com/gsmarketing/nodifymeapp
 After=network.target
 Wants=network.target

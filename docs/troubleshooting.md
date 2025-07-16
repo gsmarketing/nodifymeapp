@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-> **Common issues and solutions for NodifyMe Agent**
+> **Common issues and solutions for Nodify.Me Agent**
 
 ## Quick Diagnostics
 
@@ -230,7 +230,7 @@ echo "AGENT_AUTH_TOKEN" | base64 -d  # If it's base64 encoded
 curl -H "X-Agent-Token: YOUR_TOKEN" http://127.0.0.1:9876/metrics
 
 # Regenerate token from app
-# Get new token from NodifyMe app and update /etc/nodifyme/agent.env
+# Get new token from Nodify.Me app and update /etc/nodifyme/agent.env
 sudo systemctl restart nodifyme-agent
 ```
 
@@ -399,7 +399,7 @@ tail -f /var/log/nodifyme/agent.log
 
 **Normal startup:**
 ```
-INFO  Starting NodifyMe Agent v1.0.0
+INFO  Starting Nodify.Me Agent v1.0.0
 INFO  Loading configuration from /etc/nodifyme/config.yaml
 INFO  Starting API server on port 9876
 INFO  Agent started - monitoring server
@@ -493,7 +493,7 @@ When reporting issues, include:
 2. The exact error message
 3. Steps to reproduce the issue
 4. The diagnostic report above
-5. Your NodifyMe app version
+5. Your Nodify.Me app version
 
 ---
 

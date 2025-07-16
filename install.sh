@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# NodifyMe Agent Installation Script
-# This script installs the NodifyMe monitoring agent on Linux systems
+# Nodify.Me Agent Installation Script
+# This script installs the Nodify.Me monitoring agent on Linux systems
 
 set -e
 
@@ -83,7 +83,7 @@ detect_system() {
 
 # Function to download agent binary
 download_agent() {
-    print_status "Downloading NodifyMe agent..."
+    print_status "Downloading Nodify.Me agent..."
     
     # Create temporary directory
     TEMP_DIR=$(mktemp -d)
@@ -190,7 +190,7 @@ create_config() {
     
     # Create default configuration
     cat > "$CONFIG_DIR/config.yaml" <<EOF
-# NodifyMe Agent Configuration
+# Nodify.Me Agent Configuration
 api:
   url: "${API_URL:-http://localhost:3001}"
   timeout: 30s
@@ -238,7 +238,7 @@ create_service() {
     # Create service file
     cat > "/etc/systemd/system/$SERVICE_NAME.service" <<EOF
 [Unit]
-Description=NodifyMe Monitoring Agent
+Description=Nodify.Me Monitoring Agent
 Documentation=https://github.com/gsmarketing/nodifymeapp
 After=network.target
 Wants=network.target
@@ -305,7 +305,7 @@ EOF
 
 # Function to enable and start service
 start_service() {
-    print_status "Starting NodifyMe agent service..."
+    print_status "Starting Nodify.Me agent service..."
     
     # Enable service
     systemctl enable "$SERVICE_NAME"
@@ -350,7 +350,7 @@ verify_installation() {
 post_install_info() {
     echo
     echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}  NodifyMe Agent Installation Complete${NC}"
+    echo -e "${GREEN}  Nodify.Me Agent Installation Complete${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo
     echo -e "Service Name: ${BLUE}$SERVICE_NAME${NC}"
@@ -381,7 +381,7 @@ cleanup() {
 
 # Main installation function
 main() {
-    print_status "Starting NodifyMe agent installation..."
+    print_status "Starting Nodify.Me agent installation..."
     
     # Set up cleanup trap
     trap cleanup EXIT

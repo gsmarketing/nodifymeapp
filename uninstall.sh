@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# NodifyMe Agent Uninstallation Script
-# This script completely removes the NodifyMe monitoring agent from Linux systems
+# Nodify.Me Agent Uninstallation Script
+# This script completely removes the Nodify.Me monitoring agent from Linux systems
 
 set -e
 
@@ -48,7 +48,7 @@ check_root() {
 
 # Function to confirm uninstallation
 confirm_uninstall() {
-    echo -e "${YELLOW}This will completely remove the NodifyMe agent from your system.${NC}"
+    echo -e "${YELLOW}This will completely remove the Nodify.Me agent from your system.${NC}"
     echo -e "${YELLOW}This action cannot be undone.${NC}"
     echo
     echo -e "The following will be removed:"
@@ -272,10 +272,10 @@ verify_removal() {
 completion_message() {
     echo
     echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}  NodifyMe Agent Uninstallation Complete${NC}"
+    echo -e "${GREEN}  Nodify.Me Agent Uninstallation Complete${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo
-    echo -e "The NodifyMe agent has been completely removed from your system."
+    echo -e "The Nodify.Me agent has been completely removed from your system."
     echo
     echo -e "If you want to reinstall the agent in the future, you can:"
     echo -e "1. Download the installation script from the repository"
@@ -291,7 +291,7 @@ cleanup() {
 
 # Main uninstallation function
 main() {
-    print_status "Starting NodifyMe agent uninstallation..."
+    print_status "Starting Nodify.Me agent uninstallation..."
     
     # Set up cleanup trap
     trap cleanup EXIT
@@ -351,7 +351,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --force    Skip confirmation prompt"
             echo "  --help     Show this help message"
             echo
-            echo "This script will completely remove the NodifyMe agent from your system."
+            echo "This script will completely remove the Nodify.Me agent from your system."
             echo "Use with caution as this action cannot be undone."
             exit 0
             ;;
