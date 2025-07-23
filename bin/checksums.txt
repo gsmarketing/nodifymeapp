@@ -1,0 +1,4 @@
+2f484ee7951935da0f5279982a506c4dfa379e93b9b5d0a999d5ff516e2c4686  nodifyme-agent-linux-amd64
+20863ab064cff9b5b5f4bc4b83621c7a30d3342d629ce5187ed757330e650404  nodifyme-agent-linux-amd64.manifest
+b273658354672dc0d4f5073bfc4ce29a5e9c0ea213fe1a8ea8f7ccd78eca42b5  nodifyme-agent-linux-amd64.sig
+3ded83be606d3f0a90b532a7f1b577eb5f8b425fca274684aa61a9d97cc1ed98  nodifyme-agent-linux-arm64
