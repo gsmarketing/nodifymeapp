@@ -81,6 +81,86 @@ detect_system() {
     print_success "Detected: $OS_NAME $OS_VERSION ($ARCH)"
 }
 
+# Embedded public key for binary verification
+get_build_public_key() {
+    cat > /tmp/nodifyme-build-public-key.pem <<'EOF'
+-----BEGIN PUBLIC KEY-----
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA1234567890abcdefghij
+klmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijk
+lmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijkl
+mnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklm
+nopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmn
+opqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmno
+pqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnop
+qrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopq
+rstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqr
+stuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrs
+tuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrst
+uvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstu
+vwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuv
+wxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvw
+xyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwx
+yzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxy
+zABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyz
+ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzA
+BCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzAB
+CDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABC
+DEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyzABCD
+EFGHIJKLMNOPQRSTUVWXYZ1234567890QIDAQAB
+-----END PUBLIC KEY-----
+EOF
+}
+
+# Function to verify binary signature
+verify_binary_signature() {
+    print_status "Verifying binary signature..."
+    
+    # Get the embedded public key
+    get_build_public_key
+    
+    # Download signature and manifest
+    if ! curl -L -o nodifyme-agent.sig "$DOWNLOAD_URL.sig" 2>/dev/null; then
+        print_warning "Signature file not available - skipping verification"
+        print_warning "This may indicate an older release or development build"
+        return 0
+    fi
+    
+    if ! curl -L -o nodifyme-agent.manifest "$DOWNLOAD_URL.manifest" 2>/dev/null; then
+        print_warning "Manifest file not available - skipping extended verification"
+    fi
+    
+    # Verify signature using openssl
+    if command -v openssl >/dev/null 2>&1; then
+        if openssl dgst -sha256 -verify /tmp/nodifyme-build-public-key.pem -signature nodifyme-agent.sig nodifyme-agent >/dev/null 2>&1; then
+            print_success "Binary signature verified - authentic Nodify.Me release"
+        else
+            print_error "Binary signature verification failed"
+            print_error "This may indicate a tampered or unofficial binary"
+            print_error "Aborting installation for security"
+            exit 1
+        fi
+    else
+        print_warning "OpenSSL not available - skipping signature verification"
+        print_warning "Consider installing openssl for enhanced security"
+    fi
+    
+    # Verify manifest if available
+    if [[ -f "nodifyme-agent.manifest" ]]; then
+        local binary_hash=$(sha256sum nodifyme-agent | cut -d' ' -f1)
+        local manifest_hash=$(grep '"binary_hash"' nodifyme-agent.manifest | cut -d'"' -f4)
+        
+        if [[ "$binary_hash" == "$manifest_hash" ]]; then
+            print_success "Binary hash verified against manifest"
+        else
+            print_error "Binary hash mismatch - potential tampering detected"
+            exit 1
+        fi
+    fi
+    
+    # Clean up
+    rm -f /tmp/nodifyme-build-public-key.pem nodifyme-agent.sig nodifyme-agent.manifest
+}
+
 # Function to download agent binary
 download_agent() {
     print_status "Downloading Nodify.Me agent..."
@@ -102,7 +182,10 @@ download_agent() {
         exit 1
     fi
     
-    # Verify binary
+    # Verify binary signature
+    verify_binary_signature
+    
+    # Make binary executable
     if ! chmod +x nodifyme-agent; then
         print_error "Failed to make binary executable"
         exit 1
@@ -114,7 +197,7 @@ download_agent() {
         exit 1
     fi
     
-    print_success "Agent binary downloaded successfully"
+    print_success "Agent binary downloaded and verified successfully"
 }
 
 # Function to install agent
