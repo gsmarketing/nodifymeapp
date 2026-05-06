@@ -192,11 +192,11 @@ download_agent() {
 install_agent() {
     print_status "Installing agent to $INSTALL_DIR..."
 
-    # Stop existing service if running (prevents "Text file busy" on copy)
-    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-        print_status "Stopping existing agent service before upgrade..."
-        systemctl stop "$SERVICE_NAME" || true
-    fi
+    # Stop existing service (any state: active, failed, etc.)
+    systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+
+    # Remove old binary before copying (unlink avoids "Text file busy" on running binaries)
+    rm -f "$INSTALL_DIR/nodifyme-agent" 2>/dev/null || true
 
     # Create installation directory if it doesn't exist
     mkdir -p "$INSTALL_DIR"
