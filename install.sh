@@ -178,9 +178,10 @@ download_agent() {
         exit 1
     fi
     
-    # Test binary
-    if ! ./nodifyme-agent --version > /dev/null 2>&1; then
-        print_error "Downloaded binary is not working"
+    # Verify binary is a valid ELF executable
+    # (signature + hash already verified above; --version is not supported as a flag)
+    if ! file nodifyme-agent | grep -q "ELF"; then
+        print_error "Downloaded binary is not a valid ELF executable"
         exit 1
     fi
     
