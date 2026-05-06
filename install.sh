@@ -106,13 +106,13 @@ verify_binary_signature() {
     get_build_public_key
     
     # Download signature and manifest
-    if ! curl -L -o nodifyme-agent.sig "$DOWNLOAD_URL.sig" 2>/dev/null; then
+    if ! curl -fL -o nodifyme-agent.sig "$DOWNLOAD_URL.sig" 2>/dev/null; then
         print_warning "Signature file not available - skipping verification"
         print_warning "This may indicate an older release or development build"
         return 0
     fi
-    
-    if ! curl -L -o nodifyme-agent.manifest "$DOWNLOAD_URL.manifest" 2>/dev/null; then
+
+    if ! curl -fL -o nodifyme-agent.manifest "$DOWNLOAD_URL.manifest" 2>/dev/null; then
         print_warning "Manifest file not available - skipping extended verification"
     fi
     
