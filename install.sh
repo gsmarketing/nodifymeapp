@@ -224,10 +224,13 @@ security:
   allow_privileged: false
 EOF
 
-    # Create environment file for the agent token
+    # Create environment file for the agent (read by systemd EnvironmentFile)
     cat > "$CONFIG_DIR/agent.env" <<EOF
 # Agent Authentication Token
 AGENT_AUTH_TOKEN=${AGENT_TOKEN:-}
+
+# API URL - where the agent sends metrics and heartbeats
+API_URL=${API_URL:-http://localhost:3001}
 EOF
     
     chown "$USER_NAME:$GROUP_NAME" "$CONFIG_DIR/config.yaml"
