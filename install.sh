@@ -120,23 +120,14 @@ download_agent() {
 # Function to install agent
 install_agent() {
     print_status "Installing agent to $INSTALL_DIR..."
-
-    # Stop service if already running — required to replace a running binary on Linux
-    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-        print_status "Stopping existing agent service for upgrade..."
-        systemctl stop "$SERVICE_NAME" || true
-    fi
-
+    
     # Create installation directory if it doesn't exist
     mkdir -p "$INSTALL_DIR"
-
-    # Remove old binary first to avoid "Text file busy" error
-    rm -f "$INSTALL_DIR/nodifyme-agent"
-
+    
     # Install binary
     cp nodifyme-agent "$INSTALL_DIR/"
     chmod 755 "$INSTALL_DIR/nodifyme-agent"
-
+    
     print_success "Agent installed to $INSTALL_DIR/nodifyme-agent"
 }
 
@@ -193,54 +184,29 @@ validate_parameters() {
     print_success "Parameters validated successfully"
 }
 
-# Function to create configuration
+# Function to create agent environment file
 create_config() {
-    print_status "Creating configuration..."
-    
-    # Create default configuration
-    cat > "$CONFIG_DIR/config.yaml" <<EOF
-# Nodify.Me Agent Configuration
-api:
-  url: "${API_URL:-http://localhost:3001}"
-  timeout: 30s
-  retry_attempts: 3
+    print_status "Creating agent environment..."
 
-monitoring:
-  interval: 30s
-  metrics_retention: 24h
-  log_level: "info"
-
-discovery:
-  scan_interval: 5m
-  enabled: true
-  paths:
-    - "/var/www"
-    - "/home/*/apps"
-    - "/opt"
-
-security:
-  run_as_user: "$USER_NAME"
-  run_as_group: "$GROUP_NAME"
-  allow_privileged: false
-EOF
-
-    # Create environment file for the agent (read by systemd EnvironmentFile)
+    # agent.env is the single source of truth for agent runtime settings.
+    # Agent behavior (poll intervals, etc.) is controlled by the API via heartbeat
+    # responses — not by local config files. This keeps all agents in sync with
+    # the platform without requiring SSH access when settings change.
     cat > "$CONFIG_DIR/agent.env" <<EOF
-# Agent Authentication Token
-AGENT_AUTH_TOKEN=${AGENT_TOKEN:-}
+# Nodify.Me Agent Environment
+# Do not edit manually — agent behavior is controlled by the platform API.
 
-# API URL - where the agent sends metrics and heartbeats
+# API endpoint this agent reports to
 API_URL=${API_URL:-http://localhost:3001}
+
+# Agent authentication token (issued by the platform on server registration)
+AGENT_AUTH_TOKEN=${AGENT_TOKEN:-}
 EOF
-    
-    chown "$USER_NAME:$GROUP_NAME" "$CONFIG_DIR/config.yaml"
-    chmod 644 "$CONFIG_DIR/config.yaml"
-    
+
     chown "$USER_NAME:$GROUP_NAME" "$CONFIG_DIR/agent.env"
-    chmod 600 "$CONFIG_DIR/agent.env"  # More restrictive for token file
-    
-    print_success "Configuration created at $CONFIG_DIR/config.yaml"
-    print_success "Environment file created at $CONFIG_DIR/agent.env"
+    chmod 600 "$CONFIG_DIR/agent.env"
+
+    print_success "Agent environment created at $CONFIG_DIR/agent.env"
 }
 
 # Function to create systemd service
@@ -260,7 +226,7 @@ Type=simple
 User=$USER_NAME
 Group=$GROUP_NAME
 EnvironmentFile=$CONFIG_DIR/agent.env
-ExecStart=$INSTALL_DIR/nodifyme-agent --config $CONFIG_DIR/config.yaml
+ExecStart=$INSTALL_DIR/nodifyme-agent
 ExecReload=/bin/kill -HUP \$MAINPID
 Restart=always
 RestartSec=10
@@ -367,7 +333,7 @@ post_install_info() {
     echo
     echo -e "Service Name: ${BLUE}$SERVICE_NAME${NC}"
     echo -e "Binary Location: ${BLUE}$INSTALL_DIR/nodifyme-agent${NC}"
-    echo -e "Configuration: ${BLUE}$CONFIG_DIR/config.yaml${NC}"
+    echo -e "Environment: ${BLUE}$CONFIG_DIR/agent.env${NC}"
     echo -e "Log Directory: ${BLUE}$LOG_DIR${NC}"
     echo -e "Data Directory: ${BLUE}$DATA_DIR${NC}"
     echo
@@ -376,11 +342,6 @@ post_install_info() {
     echo -e "  View Logs: ${YELLOW}journalctl -u $SERVICE_NAME -f${NC}"
     echo -e "  Restart: ${YELLOW}systemctl restart $SERVICE_NAME${NC}"
     echo -e "  Stop: ${YELLOW}systemctl stop $SERVICE_NAME${NC}"
-    echo
-    echo -e "Next Steps:"
-    echo -e "1. Configure the agent by editing ${BLUE}$CONFIG_DIR/config.yaml${NC}"
-    echo -e "2. Set your API URL and token in the configuration"
-    echo -e "3. Restart the service: ${YELLOW}systemctl restart $SERVICE_NAME${NC}"
     echo
 }
 
