@@ -1,8 +1,8 @@
 {
   "binary_name": "nodifyme-agent-linux-amd64",
-  "binary_hash": "0c774bae45f1a50aec32378528f5a73c350f1a2ad0c58a4f99aaca5aca169859",
+  "binary_hash": "8f7435ba880e18551f92636234c9471d8deaaa28666122fd8b18f8b2d86aaf88",
   "signature_file": "nodifyme-agent-linux-amd64.sig",
-  "signed_at": "2026-05-07T07:56:49Z",
+  "signed_at": "2026-05-07T08:06:56Z",
   "signer": "nodifyme-build-system",
-  "version": "0.1.2"
+  "version": "0.1.3"
 }
