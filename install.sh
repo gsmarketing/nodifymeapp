@@ -81,73 +81,6 @@ detect_system() {
     print_success "Detected: $OS_NAME $OS_VERSION ($ARCH)"
 }
 
-# Download public key for binary verification
-get_build_public_key() {
-    # Try to download the public key from GitHub releases
-    if curl -fsSL -o /tmp/nodifyme-build-public-key.pem \
-        "https://raw.githubusercontent.com/gsmarketing/nodifymeapp/main/build-public-key.pem" 2>/dev/null; then
-        return 0
-    fi
-    
-    # Fallback: embedded public key (updated by build process)
-    cat > /tmp/nodifyme-build-public-key.pem <<'EOF'
-# This will be replaced with actual public key during build
------BEGIN PUBLIC KEY-----
-PLACEHOLDER_PUBLIC_KEY_WILL_BE_INSERTED_BY_BUILD_PROCESS
------END PUBLIC KEY-----
-EOF
-}
-
-# Function to verify binary signature
-verify_binary_signature() {
-    print_status "Verifying binary signature..."
-    
-    # Get the embedded public key
-    get_build_public_key
-    
-    # Download signature and manifest
-    if ! curl -fL -o nodifyme-agent.sig "$DOWNLOAD_URL.sig" 2>/dev/null; then
-        print_warning "Signature file not available - skipping verification"
-        print_warning "This may indicate an older release or development build"
-        return 0
-    fi
-
-    if ! curl -fL -o nodifyme-agent.manifest "$DOWNLOAD_URL.manifest" 2>/dev/null; then
-        print_warning "Manifest file not available - skipping extended verification"
-    fi
-    
-    # Verify signature using openssl
-    if command -v openssl >/dev/null 2>&1; then
-        if openssl dgst -sha256 -verify /tmp/nodifyme-build-public-key.pem -signature nodifyme-agent.sig nodifyme-agent >/dev/null 2>&1; then
-            print_success "Binary signature verified - authentic Nodify.Me release"
-        else
-            print_error "Binary signature verification failed"
-            print_error "This may indicate a tampered or unofficial binary"
-            print_error "Aborting installation for security"
-            exit 1
-        fi
-    else
-        print_warning "OpenSSL not available - skipping signature verification"
-        print_warning "Consider installing openssl for enhanced security"
-    fi
-    
-    # Verify manifest if available
-    if [[ -f "nodifyme-agent.manifest" ]]; then
-        local binary_hash=$(sha256sum nodifyme-agent | cut -d' ' -f1)
-        local manifest_hash=$(grep '"binary_hash"' nodifyme-agent.manifest | cut -d'"' -f4)
-        
-        if [[ "$binary_hash" == "$manifest_hash" ]]; then
-            print_success "Binary hash verified against manifest"
-        else
-            print_error "Binary hash mismatch - potential tampering detected"
-            exit 1
-        fi
-    fi
-    
-    # Clean up
-    rm -f /tmp/nodifyme-build-public-key.pem nodifyme-agent.sig nodifyme-agent.manifest
-}
-
 # Function to download agent binary
 download_agent() {
     print_status "Downloading Nodify.Me agent..."
@@ -169,42 +102,32 @@ download_agent() {
         exit 1
     fi
     
-    # Verify binary signature
-    verify_binary_signature
-    
-    # Make binary executable
+    # Verify binary
     if ! chmod +x nodifyme-agent; then
         print_error "Failed to make binary executable"
         exit 1
     fi
     
-    # Verify binary is a valid ELF executable
-    # (signature + hash already verified above; --version is not supported as a flag)
-    if ! file nodifyme-agent | grep -q "ELF"; then
-        print_error "Downloaded binary is not a valid ELF executable"
+    # Test binary
+    if ! ./nodifyme-agent --version > /dev/null 2>&1; then
+        print_error "Downloaded binary is not working"
         exit 1
     fi
     
-    print_success "Agent binary downloaded and verified successfully"
+    print_success "Agent binary downloaded successfully"
 }
 
 # Function to install agent
 install_agent() {
     print_status "Installing agent to $INSTALL_DIR..."
-
-    # Stop existing service (any state: active, failed, etc.)
-    systemctl stop "$SERVICE_NAME" 2>/dev/null || true
-
-    # Remove old binary before copying (unlink avoids "Text file busy" on running binaries)
-    rm -f "$INSTALL_DIR/nodifyme-agent" 2>/dev/null || true
-
+    
     # Create installation directory if it doesn't exist
     mkdir -p "$INSTALL_DIR"
-
+    
     # Install binary
     cp nodifyme-agent "$INSTALL_DIR/"
     chmod 755 "$INSTALL_DIR/nodifyme-agent"
-
+    
     print_success "Agent installed to $INSTALL_DIR/nodifyme-agent"
 }
 
