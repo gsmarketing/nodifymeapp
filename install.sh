@@ -120,14 +120,23 @@ download_agent() {
 # Function to install agent
 install_agent() {
     print_status "Installing agent to $INSTALL_DIR..."
-    
+
+    # Stop service if already running — required to replace a running binary on Linux
+    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        print_status "Stopping existing agent service for upgrade..."
+        systemctl stop "$SERVICE_NAME" || true
+    fi
+
     # Create installation directory if it doesn't exist
     mkdir -p "$INSTALL_DIR"
-    
+
+    # Remove old binary first to avoid "Text file busy" error
+    rm -f "$INSTALL_DIR/nodifyme-agent"
+
     # Install binary
     cp nodifyme-agent "$INSTALL_DIR/"
     chmod 755 "$INSTALL_DIR/nodifyme-agent"
-    
+
     print_success "Agent installed to $INSTALL_DIR/nodifyme-agent"
 }
 
