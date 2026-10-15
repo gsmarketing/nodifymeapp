@@ -2,6 +2,12 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.8
+
+**Fixed**
+- **Docker monitoring.** The agent runs as its own unprivileged user, which cannot read Docker's socket (by design: access to it is equivalent to root). Docker therefore showed as "not running", Docker Compose as "not installed", and no containers were listed. The agent now asks the privileged helper for these read-only checks. Only what monitoring needs is passed back: container names, images, states, ports, labels and the value of `NODE_ENV`. No other environment variables, arguments or mounts.
+- **A newly connected server fills in at once.** Metrics and the container list are now sent right after the agent connects, instead of after the first interval (15 minutes on the smallest plan).
+
 ## 0.1.7
 
 Released 2026-10-15.
@@ -15,6 +21,7 @@ Released 2026-10-15.
 - Support commands: `nodifyme-agent helper-check` and `nodifyme-agent helper-call`.
 
 **Security**
+- Container environment variables (which usually contain an application's secrets) are never sent from the server. Earlier versions read them to recognise frameworks and sent them along with the container list.
 - The installer now verifies the downloaded binary's SHA-256 checksum **and** its RSA signature, and refuses to install if either is missing or wrong.
 - Automatic updates no longer need sudo: the agent downloads and verifies a signed update, and a small root service re-verifies and applies it, restoring the previous version if the new one does not start.
 - Older Nodify.Me onboarding left a permanent `nodifyme-api` login on the server. The installer and uninstaller now remove it.
