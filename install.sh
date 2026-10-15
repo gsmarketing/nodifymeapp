@@ -1,4 +1,5 @@
 #!/bin/bash
+# Generated on each release; local edits to a published copy are overwritten.
 
 # Nodify.Me Agent Installation Script
 # This script installs the Nodify.Me monitoring agent on Linux systems
@@ -13,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-AGENT_VERSION="${AGENT_VERSION:-latest}"
+AGENT_VERSION="v0.1.7"
 API_URL="${API_URL:-}"
 AGENT_TOKEN="${AGENT_TOKEN:-}"
 INSTALL_DIR="/usr/local/bin"
@@ -23,6 +24,7 @@ GROUP_NAME="nodifyme"
 CONFIG_DIR="/etc/nodifyme"
 LOG_DIR="/var/log/nodifyme"
 DATA_DIR="/var/lib/nodifyme"
+HELPER_DIR="/usr/local/lib/nodifyme"
 
 # Function to print colored output
 print_status() {
@@ -89,32 +91,72 @@ download_agent() {
     TEMP_DIR=$(mktemp -d)
     cd "$TEMP_DIR"
     
-    # Download URL
+    # Download URLs (binary, checksums and signature come from the same release)
     if [[ "$AGENT_VERSION" == "latest" ]]; then
-        DOWNLOAD_URL="https://github.com/gsmarketing/nodifymeapp/releases/latest/download/nodifyme-agent-linux-$ARCH"
+        RELEASE_URL="https://github.com/gsmarketing/nodifymeapp/releases/latest/download"
     else
-        DOWNLOAD_URL="https://github.com/gsmarketing/nodifymeapp/releases/download/$AGENT_VERSION/nodifyme-agent-linux-$ARCH"
+        RELEASE_URL="https://github.com/gsmarketing/nodifymeapp/releases/download/$AGENT_VERSION"
     fi
+    BINARY_NAME="nodifyme-agent-linux-$ARCH"
     
-    # Download binary
-    if ! curl -L -o nodifyme-agent "$DOWNLOAD_URL"; then
+    # -f: fail on HTTP errors instead of saving an error page
+    if ! curl -fsSL -o nodifyme-agent "$RELEASE_URL/$BINARY_NAME"; then
         print_error "Failed to download agent binary"
         exit 1
     fi
     
-    # Verify binary
+    verify_binary
+    
     if ! chmod +x nodifyme-agent; then
         print_error "Failed to make binary executable"
         exit 1
     fi
     
-    # Test binary
-    if ! ./nodifyme-agent --version > /dev/null 2>&1; then
-        print_error "Downloaded binary is not working"
+    # Confirm it's a Linux executable. Read the ELF magic bytes directly: the
+    # `file` command is not installed on minimal server images.
+    if ! head -c 4 nodifyme-agent | grep -q $'\x7fELF'; then
+        print_error "Downloaded binary is not a valid ELF executable"
         exit 1
     fi
     
-    print_success "Agent binary downloaded successfully"
+    print_success "Agent binary downloaded and verified"
+}
+
+# Verify SHA256 (checksums.txt) and RSA signature (.sig) before anything runs.
+# Fails closed: any missing file, missing tool or mismatch aborts the install.
+verify_binary() {
+    print_status "Verifying binary checksum and signature..."
+    
+    for tool in sha256sum openssl; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            print_error "$tool is required to verify the agent binary"
+            exit 1
+        fi
+    done
+    
+    if ! curl -fsSL -o checksums.txt "$RELEASE_URL/checksums.txt" || \
+       ! curl -fsSL -o nodifyme-agent.sig "$RELEASE_URL/$BINARY_NAME.sig" || \
+       ! curl -fsSL -o build-public-key.pem "https://raw.githubusercontent.com/gsmarketing/nodifymeapp/main/build-public-key.pem"; then
+        print_error "Could not download verification files; refusing to install"
+        exit 1
+    fi
+    
+    local expected actual
+    expected=$(awk -v f="$BINARY_NAME" '$2 == f || $2 == "*"f {print $1}' checksums.txt)
+    actual=$(sha256sum nodifyme-agent | cut -d' ' -f1)
+    if [[ -z "$expected" || "$expected" != "$actual" ]]; then
+        print_error "Checksum mismatch for $BINARY_NAME; refusing to install"
+        exit 1
+    fi
+    
+    if ! openssl dgst -sha256 -verify build-public-key.pem -signature nodifyme-agent.sig nodifyme-agent >/dev/null 2>&1; then
+        print_error "Signature verification failed; refusing to install"
+        exit 1
+    fi
+    
+    # build-public-key.pem stays in TEMP_DIR: create_update_helper installs it root-owned
+    rm -f checksums.txt nodifyme-agent.sig
+    print_success "Checksum and signature verified"
 }
 
 # Function to install agent
@@ -123,6 +165,13 @@ install_agent() {
     
     # Create installation directory if it doesn't exist
     mkdir -p "$INSTALL_DIR"
+    
+    # Stop a running agent and unlink the old binary first
+    # (copying over a running binary fails with "Text file busy")
+    systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+    # The root helper is the same binary: stop it too, so no old code keeps serving
+    systemctl stop nodifyme-helper.service 2>/dev/null || true
+    rm -f "$INSTALL_DIR/nodifyme-agent" 2>/dev/null || true
     
     # Install binary
     cp nodifyme-agent "$INSTALL_DIR/"
@@ -259,6 +308,186 @@ EOF
     print_success "Systemd service created"
 }
 
+# Self-update without sudo: the agent (unprivileged, NoNewPrivileges) only stages a
+# binary + signature in $DATA_DIR. A root path unit picks it up, re-verifies the
+# signature against a root-owned key, swaps the binary and restarts the agent.
+create_update_helper() {
+    print_status "Installing self-update helper..."
+
+    mkdir -p "$HELPER_DIR"
+    chown root:root "$HELPER_DIR"
+    chmod 755 "$HELPER_DIR"
+
+    install -o root -g root -m 644 "$TEMP_DIR/build-public-key.pem" "$HELPER_DIR/build-public-key.pem"
+
+    cat > "$HELPER_DIR/apply-update.sh" <<'EOF'
+#!/bin/bash
+# Nodify.Me agent update helper. Runs as root from nodifyme-agent-update.service.
+# Treats the staged files as untrusted: they are written by the agent user.
+set -euo pipefail
+
+STAGED=/var/lib/nodifyme/pending-update
+STAGED_SIG=/var/lib/nodifyme/pending-update.sig
+PUBKEY=/usr/local/lib/nodifyme/build-public-key.pem
+TARGET=/usr/local/bin/nodifyme-agent
+PREVIOUS=/usr/local/lib/nodifyme/nodifyme-agent.prev
+SERVICE=nodifyme-agent
+
+log() { echo "agent-update: $*"; }
+
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+
+# Copy into a root-only directory before checking anything, then remove the staged
+# files so the path unit doesn't retrigger and the agent can't swap them mid-check.
+for f in "$STAGED" "$STAGED_SIG"; do
+    if [[ -L "$f" || ! -f "$f" ]]; then
+        log "rejecting $f: missing, not a regular file, or a symlink"
+        rm -f "$STAGED" "$STAGED_SIG"
+        exit 1
+    fi
+done
+cp "$STAGED" "$WORK/agent"
+cp "$STAGED_SIG" "$WORK/agent.sig"
+rm -f "$STAGED" "$STAGED_SIG"
+
+if ! openssl dgst -sha256 -verify "$PUBKEY" -signature "$WORK/agent.sig" "$WORK/agent" >/dev/null 2>&1; then
+    log "signature verification failed; update refused"
+    exit 1
+fi
+if ! head -c 4 "$WORK/agent" | grep -q $'\x7fELF'; then
+    log "staged file is not an ELF executable; update refused"
+    exit 1
+fi
+
+# Keep the current binary for rollback, then swap atomically (no "Text file busy").
+cp -p "$TARGET" "$PREVIOUS"
+install -o root -g root -m 755 "$WORK/agent" "$TARGET.new"
+mv -f "$TARGET.new" "$TARGET"
+# The root helper is the same binary: stop it so the next request starts the new one
+systemctl stop nodifyme-helper.service 2>/dev/null || true
+systemctl restart "$SERVICE"
+
+sleep 10
+if systemctl is-active --quiet "$SERVICE"; then
+    log "update applied; $SERVICE is running"
+    exit 0
+fi
+
+log "new binary did not stay up; rolling back"
+install -o root -g root -m 755 "$PREVIOUS" "$TARGET.new"
+mv -f "$TARGET.new" "$TARGET"
+systemctl stop nodifyme-helper.service 2>/dev/null || true
+systemctl restart "$SERVICE"
+exit 1
+EOF
+    chown root:root "$HELPER_DIR/apply-update.sh"
+    chmod 755 "$HELPER_DIR/apply-update.sh"
+
+    cat > "/etc/systemd/system/$SERVICE_NAME-update.service" <<EOF
+[Unit]
+Description=Nodify.Me Agent Update (applies a staged, signed binary)
+
+[Service]
+Type=oneshot
+ExecStart=$HELPER_DIR/apply-update.sh
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectHome=true
+EOF
+
+    cat > "/etc/systemd/system/$SERVICE_NAME-update.path" <<EOF
+[Unit]
+Description=Watch for a staged Nodify.Me agent update
+
+[Path]
+PathExists=$DATA_DIR/pending-update
+Unit=$SERVICE_NAME-update.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable --now "$SERVICE_NAME-update.path"
+
+    print_success "Self-update helper installed"
+}
+
+# Privileged helper: the root half of the privilege split. The agent stays
+# unprivileged (NoNewPrivileges, ProtectSystem=strict); for managed actions it asks
+# `nodifyme-agent helper` over a unix socket. systemd owns the socket and starts the
+# helper only when the agent connects; the helper exits after a minute idle. It
+# accepts only the agent user (checked by the kernel via SO_PEERCRED) and runs only
+# fixed, compiled-in actions. It is the same signed binary as the agent, so updates
+# cover both (see AGENT-OPERATIONS.md, Managed Action Privilege Model).
+create_helper() {
+    print_status "Installing privileged helper (socket-activated)..."
+
+    cat > "/etc/systemd/system/nodifyme-helper.socket" <<EOF
+[Unit]
+Description=Nodify.Me privileged helper socket
+
+[Socket]
+ListenStream=/run/nodifyme/helper.sock
+SocketMode=0660
+SocketUser=root
+SocketGroup=$GROUP_NAME
+DirectoryMode=0755
+RemoveOnStop=true
+
+[Install]
+WantedBy=sockets.target
+EOF
+
+    cat > "/etc/systemd/system/nodifyme-helper.service" <<EOF
+[Unit]
+Description=Nodify.Me privileged helper (root; started on demand, exits when idle)
+Requires=nodifyme-helper.socket
+After=nodifyme-helper.socket
+
+[Service]
+Type=simple
+# No User= line on purpose: the service runs as root by default, and naming root
+# explicitly makes systemd drop CAP_SETUID when hardening is on, which breaks
+# apt (it cannot switch to its _apt sandbox user).
+Environment=NODIFYME_AGENT_USER=$USER_NAME
+ExecStart=$INSTALL_DIR/nodifyme-agent helper
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nodifyme-helper
+
+# Hardening that fits any action. Filesystem protections (ProtectSystem and
+# friends) are decided per real action once those exist.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictRealtime=true
+EOF
+
+    systemctl daemon-reload
+    systemctl enable --now nodifyme-helper.socket
+
+    print_success "Privileged helper socket installed"
+}
+
+# Older onboarding left a permanent SSH login on the server: a `nodifyme-api` user
+# whose key the platform kept. Nodify.Me no longer uses SSH after the install (the
+# agent connects out instead), so remove that login if it exists.
+remove_legacy_ssh_access() {
+    if id nodifyme-api &>/dev/null; then
+        print_status "Removing the legacy nodifyme-api SSH login..."
+        pkill -u nodifyme-api 2>/dev/null || true
+        userdel -r nodifyme-api 2>/dev/null || true
+        rm -rf /opt/nodifyme 2>/dev/null || true
+        print_success "Legacy SSH login removed"
+    fi
+}
+
 # Function to create logrotate configuration
 create_logrotate() {
     print_status "Creating logrotate configuration..."
@@ -321,6 +550,15 @@ verify_installation() {
         exit 1
     fi
     
+    # Check the privileged helper answers the agent user. Not fatal: monitoring
+    # works without it, but managed actions (install, deploy) will not.
+    if runuser -u "$USER_NAME" -- "$INSTALL_DIR/nodifyme-agent" helper-check >/dev/null 2>&1; then
+        print_success "Privileged helper verified"
+    else
+        print_warning "Privileged helper did not answer; managed actions will be unavailable."
+        print_warning "Check: systemctl status nodifyme-helper.socket; journalctl -u nodifyme-helper"
+    fi
+
     print_success "Installation verified successfully"
 }
 
@@ -385,7 +623,14 @@ main() {
     
     # Create service
     create_service
-    
+
+    # Install the root-side self-update helper
+    create_update_helper
+
+    create_helper
+
+    remove_legacy_ssh_access
+
     # Create logrotate
     create_logrotate
     
@@ -403,7 +648,7 @@ main() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         --version)
-            AGENT_VERSION="$2"
+            AGENT_VERSION="v0.1.7"
             shift 2
             ;;
         --api-url)

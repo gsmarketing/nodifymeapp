@@ -54,11 +54,14 @@ confirm_uninstall() {
     echo -e "The following will be removed:"
     echo -e "  - Binary: ${BLUE}$INSTALL_DIR/nodifyme-agent${NC}"
     echo -e "  - Service: ${BLUE}$SERVICE_NAME${NC}"
+    echo -e "  - Privileged helper: ${BLUE}nodifyme-helper.socket / nodifyme-helper.service${NC}"
     echo -e "  - Configuration: ${BLUE}$CONFIG_DIR${NC}"
     echo -e "  - Logs: ${BLUE}$LOG_DIR${NC}"
     echo -e "  - Data: ${BLUE}$DATA_DIR${NC}"
     echo -e "  - User: ${BLUE}$USER_NAME${NC}"
     echo -e "  - Group: ${BLUE}$GROUP_NAME${NC}"
+    echo
+    echo -e "Nodify.Me is told the agent was removed; the server stays in your account as \"Agent Missing\" and its data is kept."
     echo
     read -p "Are you sure you want to continue? (yes/no): " -r
     echo
@@ -69,6 +72,32 @@ confirm_uninstall() {
 }
 
 # Function to stop and disable service
+# Older onboarding left a permanent SSH login on the server: a `nodifyme-api` user
+# whose key the platform kept. Nodify.Me no longer uses SSH after the install (the
+# agent connects out instead), so remove that login if it exists.
+remove_legacy_ssh_access() {
+    if id nodifyme-api &>/dev/null; then
+        print_status "Removing the legacy nodifyme-api SSH login..."
+        pkill -u nodifyme-api 2>/dev/null || true
+        userdel -r nodifyme-api 2>/dev/null || true
+        rm -rf /opt/nodifyme 2>/dev/null || true
+        print_success "Legacy SSH login removed"
+    fi
+}
+
+# Tell Nodify.Me this agent is being removed, so the server shows as "missing"
+# (its data is kept) straight away instead of after days of silence. Best effort.
+send_goodbye() {
+    if [[ -x "$INSTALL_DIR/nodifyme-agent" && -f "$CONFIG_DIR/agent.env" ]]; then
+        print_status "Telling Nodify.Me this agent is being removed..."
+        if (set -a; . "$CONFIG_DIR/agent.env"; set +a; "$INSTALL_DIR/nodifyme-agent" goodbye); then
+            print_success "Nodify.Me notified"
+        else
+            print_warning "Could not reach Nodify.Me; the server will show as missing after a few days without contact"
+        fi
+    fi
+}
+
 stop_service() {
     print_status "Stopping and disabling service..."
     
@@ -100,7 +129,18 @@ remove_service() {
     else
         print_warning "Service file not found"
     fi
-    
+
+    # Privileged helper socket and service
+    systemctl disable --now nodifyme-helper.socket 2>/dev/null || true
+    systemctl stop nodifyme-helper.service 2>/dev/null || true
+    rm -f /etc/systemd/system/nodifyme-helper.socket /etc/systemd/system/nodifyme-helper.service
+    rm -rf /run/nodifyme
+
+    # Self-update path unit, its oneshot service and the root helper directory
+    systemctl disable --now "$SERVICE_NAME-update.path" 2>/dev/null || true
+    rm -f "/etc/systemd/system/$SERVICE_NAME-update.path" "/etc/systemd/system/$SERVICE_NAME-update.service"
+    rm -rf /usr/local/lib/nodifyme
+
     # Reload systemd
     systemctl daemon-reload
     print_success "Systemd reloaded"
@@ -302,11 +342,17 @@ main() {
     # Confirm uninstallation
     confirm_uninstall
     
+    # Tell Nodify.Me first, while the agent binary and token still exist
+    send_goodbye
+
     # Stop and disable service
     stop_service
     
     # Remove systemd service
     remove_service
+
+    # Remove the legacy SSH login, if an older onboarding created one
+    remove_legacy_ssh_access
     
     # Remove binary
     remove_binary

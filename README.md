@@ -1,359 +1,95 @@
 # Nodify.Me Agent
 
-> **Companion monitoring agent for the Nodify.Me web application**
+The Nodify.Me agent is a small program that runs on your server and connects it to your [Nodify.Me](https://nodifyme.app) account. It reports how the server is doing, and it carries out the actions you start in the web app. On its own it does nothing useful: it needs a Nodify.Me account.
 
-The Nodify.Me Agent is a lightweight monitoring daemon that runs on your servers to collect system metrics and detect Node.js applications (Next.js, Nest.js, Vite) and Docker containers.
-
-**⚠️ Important:** This agent is designed to work with the Nodify.Me web application. The agent alone is not useful - it requires the web application to function.
+See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
 
 ---
 
-## Installation Methods
+## Install
 
-### **Recommended: Install via Web Application** ✅
+**Recommended: from the Nodify.Me web app.** Choose *Add a server*, enter the server's IP address and login, and let the app check the server and install the agent. The app shows everything it finds and every step as it happens. Your login is used once for the install.
 
-**The easiest way to install the agent is through the Nodify.Me web application:**
+**Or install it yourself.** In the web app choose *I will install it myself* (or *Get install command* on a server's page). It shows a command like this; run it on the server as root:
 
-1. Log into your Nodify.Me dashboard
-2. Click "Add Server"
-3. Enter your server details (hostname/IP, SSH credentials)
-4. Click "Deploy Agent"
-5. Wait for automatic installation to complete
+```bash
+curl -fsSL https://raw.githubusercontent.com/gsmarketing/nodifymeapp/main/install.sh | \
+  sudo bash -s -- --api-url https://YOUR-NODIFYME-URL --token YOUR-AGENT-TOKEN
+```
 
-**The web app handles:**
-- SSH connection to your server
-- Downloading the correct binary for your architecture
-- Installing and configuring the agent
-- Starting the systemd service
-- Verifying the agent is online
+The token belongs to one server. A new install command replaces the old token. More detail: [docs/manual-install.md](docs/manual-install.md).
 
-**You don't need to run any commands manually!**
+### Requirements
+
+- Linux with **systemd**, `curl`, `openssl` and `sha256sum`; root or `sudo` for the install.
+- Outgoing HTTPS from the server to your Nodify.Me URL and to `github.com`.
+- **Tested on Ubuntu 24.04 LTS (x86_64).** Binaries are also built for arm64. Other distributions are untested; the installer stops with a clear message if something it needs is missing.
 
 ---
 
-### **Alternative: Manual Installation** (Advanced Users)
+## What the agent does
 
-**Only use this method if:**
-- ❌ Web app deployment failed and you need to troubleshoot
-- ❌ You want to customize the installation
-- ❌ You're testing the agent in a development environment
+- **Reports** a heartbeat, CPU, memory and disk use, the Docker containers running on the server (names, images, state), and which common server software is installed and how it is set up: Docker, nginx, Certbot, the firewall (UFW), Fail2ban, automatic updates and SSH hardening settings.
+- **Runs actions you ask for.** Actions run only when you start them in the web app, from a fixed list that is built into the agent. Today that list is: install Docker, install nginx, install Certbot. If something is already installed it is left alone. If something is already on the server that an action would have to change, the action stops, changes nothing, and tells you what it found. Nothing is replaced unless you approve it, and replaced files are backed up first.
+- **Updates itself** (see below).
 
-**If webapp deployment is working, you DON'T need this!**
+It does not run free-form commands. It never sends your applications' environment variables, files, logs or databases: for each container it reports only the name, image, state, ports and labels (the agent reads a container's environment locally to recognise frameworks, and discards it).
 
-#### **Manual Installation Steps:**
+## What gets installed
 
-1. **SSH into your server:**
-   ```bash
-   ssh user@your-server-ip
-   ```
+| What | Where |
+|---|---|
+| Agent program | `/usr/local/bin/nodifyme-agent` |
+| Dedicated user and group | `nodifyme` (no login shell) |
+| Settings: your Nodify.Me URL and this server's token (readable only by `nodifyme` and root) | `/etc/nodifyme/agent.env` |
+| Data and logs | `/var/lib/nodifyme`, `/var/log/nodifyme` |
+| Agent service | `nodifyme-agent.service` |
+| Update service | `nodifyme-agent-update.path` and `.service`, with files in `/usr/local/lib/nodifyme` |
+| Privileged helper | `nodifyme-helper.socket` and `.service` |
 
-2. **Get your agent token from the web app:**
-   - Go to: Settings → Servers → [Your Server] → "View Agent Token"
-   - Copy the token (looks like: `eyJ0eXAiOiJKV1QiLCJhbGc...`)
+## How it stays safe
 
-3. **Run the installation script:**
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/gsmarketing/nodifymeapp/main/install.sh | \
-     sudo bash -s -- --api-url YOUR_API_URL --token YOUR_AGENT_TOKEN
-   ```
+- The agent runs as the unprivileged `nodifyme` user with systemd hardening. It **opens no listening port** that is reachable from the network. It makes outgoing connections only to your Nodify.Me URL and to GitHub (to look for new versions).
+- Work that needs root is done by a small **privileged helper**. It is started only when the agent asks, stops after about a minute without a request, accepts requests only from the `nodifyme` user, and can run only the built-in actions above, with fixed programs and arguments, never a command string.
+- **Everything downloaded is verified.** The installer checks the binary's SHA-256 checksum and its RSA-4096 signature against [build-public-key.pem](build-public-key.pem) and refuses to install if either is missing or wrong. Automatic updates are checked the same way.
+- The agent needs **no SSH access** to your server after it is installed.
 
-   **Example:**
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/gsmarketing/nodifymeapp/main/install.sh | \
-     sudo bash -s -- \
-     --api-url https://app.nodifyme.com \
-     --token eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...
-   ```
-
-4. **Verify installation:**
-   ```bash
-   systemctl status nodifyme-agent
-   ```
-
----
-
-## Installation Requirements
-
-- **Linux Server:** Ubuntu 20.04+ or Debian 11+ (Debian-based distributions)
-- **Architecture:** AMD64 (x86_64) or ARM64 (aarch64)
-- **Root/sudo access:** Required for installation
-- **Network access:** Must reach your Nodify.Me web application
-- **systemd:** For service management
-
-**Note:** Currently tested and supported on Debian-based distributions only. Support for additional platforms may be added in future releases.
-
----
-
-## Installation Parameters
-
-| Parameter | Required | Description | Example |
-|-----------|----------|-------------|---------|
-| `--api-url` | ✅ | URL of your Nodify.Me web application | `https://app.nodifyme.com` |
-| `--token` | ✅ | Agent authentication token from web app | `eyJ0eXAiOiJKV1QiLCJhbGc...` |
-| `--version` | ❌ | Specific version to install (default: latest) | `v0.1.1` |
-
-**Where to find these:**
-- **API URL:** Your Nodify.Me web app URL (where you login)
-- **Token:** Generated by web app when you add a server
-
----
-
-## What Gets Installed
-
-The installation script will:
-- Download the appropriate binary for your architecture
-- Verify binary signature (if available)
-- Create a dedicated `nodifyme` system user (non-root)
-- Install the agent as a systemd service
-- Configure monitoring directories
-- Set up log rotation
-- Generate secure configuration files
-
-**Installation Locations:**
-```
-/usr/local/bin/nodifyme-agent          # Agent binary
-/etc/nodifyme/config.yaml               # Configuration
-/etc/nodifyme/agent.env                 # Environment variables
-/var/log/nodifyme/                      # Logs
-/var/lib/nodifyme/                      # Data storage
-/etc/systemd/system/nodifyme-agent.service  # Systemd unit
-```
-
----
-
-## Agent Capabilities
-
-### **System Monitoring**
-- CPU usage (real-time processor utilization)
-- Memory usage (RAM and swap)
-- Disk usage (storage space and I/O)
-- Network statistics (bandwidth and connections)
-
-### **Application Discovery**
-- Next.js applications (automatic detection)
-- Nest.js applications (API and services)
-- Vite applications (dev and prod builds)
-- Generic Node.js processes
-
-### **Container Monitoring**
-- Docker containers (resource usage and health)
-- Container logs (read-only access)
-- Image information (metadata and versions)
-
-### **Security Features**
-- Token-based authentication (secure communication with web app)
-- Localhost-only binding (agent API not exposed externally)
-- Command whitelisting (only approved operations allowed)
-- Non-root execution (runs as dedicated system user)
-- Binary signing (RSA-4096 signatures for tamper detection)
-
----
-
-## Service Management
-
-**Check agent status:**
-```bash
-systemctl status nodifyme-agent
-```
-
-**View real-time logs:**
-```bash
-journalctl -u nodifyme-agent -f
-```
-
-**Restart agent:**
-```bash
-sudo systemctl restart nodifyme-agent
-```
-
-**Stop agent:**
-```bash
-sudo systemctl stop nodifyme-agent
-```
-
-**View configuration:**
-```bash
-cat /etc/nodifyme/config.yaml
-cat /etc/nodifyme/agent.env
-```
-
----
-
-## Uninstallation
-
-**Remove the agent completely:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/gsmarketing/nodifymeapp/main/uninstall.sh | sudo bash
-```
-
-**Or download and run manually:**
-```bash
-curl -fsSL -O https://raw.githubusercontent.com/gsmarketing/nodifymeapp/main/uninstall.sh
-chmod +x uninstall.sh
-sudo ./uninstall.sh
-```
-
-**What gets removed:**
-- Agent binary and systemd service
-- Configuration files
-- Log files and data
-- `nodifyme` system user
-
-**Note:** Uninstalling the agent does NOT delete the server from your web app. You should also remove it from the webapp to clean up properly.
-
----
-
-## Troubleshooting
-
-### **Agent Not Starting**
+To verify a download yourself:
 
 ```bash
-# Check service status
-systemctl status nodifyme-agent
-
-# View detailed logs
-journalctl -u nodifyme-agent --no-pager -n 50
-
-# Verify configuration
-cat /etc/nodifyme/agent.env
-cat /etc/nodifyme/config.yaml
-
-# Check file permissions
-ls -la /etc/nodifyme/
-ls -la /var/log/nodifyme/
-```
-
-### **Connection Issues**
-
-```bash
-# Test network connectivity to web app
-curl -I https://your-app-url.com
-
-# Verify agent is listening (port 9876)
-ss -tlnp | grep 9876
-
-# Check firewall
-sudo ufw status
-
-# Test websocket connection
-curl -v http://localhost:9876/health
-```
-
-### **Permission Errors**
-
-```bash
-# Check file ownership
-ls -la /etc/nodifyme/
-ls -la /var/log/nodifyme/
-ls -la /var/lib/nodifyme/
-
-# Fix permissions if needed
-sudo chown -R nodifyme:nodifyme /etc/nodifyme/
-sudo chown -R nodifyme:nodifyme /var/log/nodifyme/
-sudo chown -R nodifyme:nodifyme /var/lib/nodifyme/
-```
-
-### **Binary Signature Verification Failed**
-
-```bash
-# Check if signature files exist
-ls -la /tmp/*.sig
-
-# Manually verify signature
 openssl dgst -sha256 -verify build-public-key.pem \
-  -signature nodifyme-agent-linux-amd64.sig \
-  nodifyme-agent-linux-amd64
-
-# Skip verification (not recommended)
-export SKIP_SIGNATURE_VERIFICATION=1
-./install.sh --api-url URL --token TOKEN
+  -signature nodifyme-agent-linux-amd64.sig nodifyme-agent-linux-amd64
+sha256sum -c checksums.txt --ignore-missing
 ```
 
----
+## Updates
 
-## Getting Help
+The agent checks GitHub for a newer release every six hours. It downloads and verifies it, and a small root service re-verifies and installs it, restoring the previous version if the new one does not start. To update by hand (this also adds the privileged helper to servers installed with an older version):
 
-**If installation fails:**
-
-1. **Check web app logs** - Your Nodify.Me dashboard shows deployment logs
-2. **Check agent logs** - `journalctl -u nodifyme-agent -n 50`
-3. **Verify requirements** - Linux, systemd, network access
-4. **Check firewall** - Ensure outbound HTTPS is allowed
-5. **Review documentation:**
-   - [Manual Installation Guide](docs/manual-install.md)
-   - [Troubleshooting Guide](docs/troubleshooting.md)
-
-**If you found a bug:**
-- Report via your Nodify.Me web application (if available)
-- Or create an issue in this repository
-
----
-
-## How It Works
-
-```
-┌─────────────────┐         SSH/WebSocket          ┌─────────────────┐
-│  Nodify.Me App  │◄──────────────────────────────►│  Agent (Server) │
-│  (Web Browser)  │                                │  Port 9876      │
-└─────────────────┘                                └─────────────────┘
-         │                                                  │
-         │                                                  │
-    User clicks                                    Collects metrics
-    "Add Server"                                   Detects apps/containers
-         │                                         Sends to web app
-         │                                                  │
-    App deploys agent via SSH ────────────────────────────►
+```bash
+curl -fsSLO https://raw.githubusercontent.com/gsmarketing/nodifymeapp/main/update.sh
+sudo bash update.sh            # latest; or: sudo bash update.sh v0.1.7
 ```
 
-**Deployment Flow:**
-1. User adds server in web app
-2. Web app establishes SSH connection
-3. Web app runs install script on server
-4. Agent starts and connects back to web app
-5. Web app displays real-time metrics
+## Everyday commands
 
-**The agent is NOT standalone** - it requires the Nodify.Me web application to function.
+```bash
+systemctl status nodifyme-agent            # is it running?
+journalctl -u nodifyme-agent -f            # live log
+sudo systemctl restart nodifyme-agent
+nodifyme-agent --version
+sudo -u nodifyme nodifyme-agent helper-check   # is the privileged helper working?
+```
 
----
+## Uninstall
 
-## Architecture
+```bash
+curl -fsSLO https://raw.githubusercontent.com/gsmarketing/nodifymeapp/main/uninstall.sh
+sudo bash uninstall.sh
+```
 
-**Designed for:**
-- **Minimal Resource Usage** - Low CPU and memory footprint (~10-20MB RAM)
-- **Security First** - Non-root user, localhost binding, token auth
-- **Easy Deployment** - One-click from web app, or one command manually
-- **Reliable Monitoring** - Auto-reconnect, exponential backoff, dormancy mode
+It asks you to confirm, tells Nodify.Me the agent was removed (the server then shows as *Agent Missing* in your account and its data is kept), and removes the agent, its services, user and files. Software installed by actions (Docker, nginx, Certbot) is **not** removed.
 
-**Technology:**
-- Written in Go 1.22+
-- Statically compiled (no dependencies)
-- Binary signing (RSA-4096)
-- WebSocket communication
-- systemd integration
+## Problems
 
----
-
-## Version Information
-
-**Current Version:** v0.1.1
-
-**Release Notes:** [RELEASE_NOTES_v0.1.1.md](RELEASE_NOTES_v0.1.1.md)
-
-**Compatibility:**
-- Requires Nodify.Me web app v0.1.0 or later
-- Supports Ubuntu 20.04+, Debian 11+ (Debian-based distributions)
-- Supports AMD64 and ARM64 architectures
-
----
-
-## License
-
-Copyright © 2025 Nodify.Me. All rights reserved.
-
----
-
----
-
-**Nodify.Me Agent - Companion monitoring for your servers** 🚀
-
-*Best installed via the Nodify.Me web application for automatic deployment and configuration*
+See [docs/troubleshooting.md](docs/troubleshooting.md).
