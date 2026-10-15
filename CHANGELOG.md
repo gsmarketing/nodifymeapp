@@ -2,6 +2,11 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.10
+
+**New**
+- **The server page catches up at once after an install.** When Install Docker, nginx or Certbot succeeds, the agent reports the new server stack and containers right away, instead of at its next 10-minute scan.
+
 ## 0.1.9
 
 **New**
