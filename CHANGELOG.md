@@ -2,6 +2,15 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.9
+
+**New**
+- **Check now.** The web app can ask the agent to report immediately (heartbeat, metrics, server stack and containers), for example after you changed something on the server. The web app limits it to once per your plan's reporting interval.
+- **Update from the web app.** When a newer release exists, the web app can tell the agent to update itself. The agent downloads the release, verifies its checksum and signature, reports the result, and only then restarts through the same root update service as automatic updates. A download that fails verification is refused and nothing changes.
+
+**Fixed**
+- **A misleading first CPU reading.** The first metrics are sent as soon as the agent connects, which on a new server is right after the installer ran and the machine is at its busiest, so the server page could show 100% CPU for the first 15 minutes. CPU is now measured over three seconds instead of one, and a second sample is sent a minute after connecting to replace that first reading.
+
 ## 0.1.8
 
 **Fixed**
