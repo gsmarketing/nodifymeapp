@@ -2,6 +2,13 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.13
+
+**New**
+- **Reports on your plan's schedule.** The agent now takes its reporting interval from Nodify.Me, so a Pro server reports about every 5 minutes and a Business server about every minute. Until now every agent used the 15-minute default whatever the plan. The interval arrives with each heartbeat answer, so a plan change takes effect by itself, and an agent that has not heard from Nodify.Me keeps its last interval (15 minutes on a fresh install). Values outside 30 seconds to 1 hour are ignored.
+- **Checks for updates soon after it starts.** A newly started agent looks for a newer release about two minutes after it connects, instead of waiting for its next six-hourly check. A server that was offline when a release came out no longer waits hours to catch up.
+- **A clearer message when Let's Encrypt is blocked.** If a certificate request fails because Let's Encrypt was answered with a 403 (what Cloudflare and similar proxies send to its checker), the deploy now says so and explains the fix: a rule that skips security checks for `/.well-known/acme-challenge/`, or setting the record to DNS only until the certificate is issued.
+
 ## 0.1.12
 
 **New**
