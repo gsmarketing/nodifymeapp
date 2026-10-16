@@ -2,6 +2,18 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.11
+
+**New**
+- **Run a Docker app from the web app.** Give Nodify.Me a public image (such as `ghcr.io/you/site:1.4.0`), the port it listens on, optional environment variables and, optionally, a domain. The agent pulls the image, runs it with Docker Compose, publishes it only on the server's own loopback address, and (with a domain) adds an nginx site that proxies the domain to it. Start, stop, restart, redeploy, view logs and remove from the web app. Nothing is built on your server.
+- **What is touched.** Apps live in `/srv/nodifyme/apps/<name>/` and their nginx sites in `/etc/nginx/conf.d/nodifyme-app-<name>.conf`; the agent only modifies files it created and asks before replacing anything else. Environment values are written only to a root-only file on the server and are never logged. Uninstalling the agent leaves your apps running and their files in place.
+- **Private images.** Add a registry login (registry, username, access token) to an app. The agent signs in for that one pull only, using a temporary file that is removed straight afterwards; nothing stays logged in on your server.
+- **Image check before it starts.** The agent inspects a pulled image first. An image built for the wrong CPU (for example arm64 on an amd64 server) is refused with a clear message and nothing is changed, instead of failing later with "exec format error". It also warns when the image declares a different port than the one you set, runs as root, declares volumes, or is very large.
+- **Protection against a runaway app.** A container is limited to 75% of the server's memory so an app that leaks or spikes is stopped on its own instead of taking SSH or the agent down with it, and its logs rotate (10 MB, 3 files) so they cannot fill the disk. Before pulling, the agent refuses to continue with less than 2 GB of free disk space, and warns on servers with little memory or no swap.
+- **Firewall (UFW) from the web app.** Install UFW, see what is open, open or close a port (optionally only for one address or range), and turn the firewall on or off. Turning it on always keeps SSH open (and can keep web ports 80 and 443 open), and it switches itself off again if it cannot confirm SSH is allowed. The rule that lets you in over SSH cannot be removed while the firewall is on. Rules you already had are kept.
+- **Fail2ban from the web app.** Install Fail2ban (its standard settings watch SSH; no configuration is written), see each jail with the addresses it has banned, and release one address or all of them, for example if you banned yourself.
+- Deploying needs Docker (and nginx, if you use a domain); the web app tells you when one is missing. HTTPS certificates are not part of this release.
+
 ## 0.1.10
 
 **New**
