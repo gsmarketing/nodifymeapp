@@ -2,6 +2,13 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.12
+
+**New**
+- **HTTPS for an app's domain.** When an app has a domain, the agent can request a free Let's Encrypt certificate with Certbot and serve the app over HTTPS. The domain must already point at the server, because Let's Encrypt checks it over plain HTTP. The app goes live over HTTP first, the certificate is requested, and only then is HTTPS switched on. If the certificate cannot be issued, the app keeps running over HTTP and the deploy says why. Certificates renew by themselves through Certbot's timer, and deploying again reuses an existing certificate instead of asking for a new one.
+- **Optional redirect to HTTPS.** Plain HTTP can redirect to HTTPS. The path Let's Encrypt uses to check the domain stays reachable over HTTP, so renewals keep working. If the domain sits behind a proxy such as Cloudflare, use the redirect only when the proxy talks HTTPS to your server (Cloudflare's Full or Full (strict) mode); otherwise visitors get a redirect loop.
+- Deploying with HTTPS needs Certbot installed (the web app tells you when it is missing). If the firewall is on and port 443 is closed, the deploy warns you that visitors cannot reach HTTPS yet; it never changes the firewall itself. Removing an app also removes the certificate that app's site used.
+
 ## 0.1.11
 
 **New**
