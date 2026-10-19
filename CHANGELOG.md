@@ -2,6 +2,21 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.14
+
+**New**
+- **Container logs and restart.** The web app can show the recent logs of any container on the server. For containers of apps that Nodify.Me deployed it can also restart them, and start, stop and restart the app as a whole. Containers that Nodify.Me did not deploy are read-only: you can look at their logs, and nothing else is done to them.
+- **Container CPU and memory.** The agent now reports how much CPU and memory each running container uses, so the web app can show it per container and over time.
+- **Automatic security updates from the web app.** Where `unattended-upgrades` is missing or switched off, the web app can install it and turn it on. Nothing else about the server's update settings is changed, and a server that already had it on is left alone.
+- **Server settings.** Set the server's timezone from a list the server itself provides, and restart the whole server from the web app. A restart is scheduled a minute ahead so you can still read the warning, and the result reaches the web app before the server goes down.
+- **Scheduled tasks, read-only.** The web app can list the server's cron jobs (from the system crontab, `/etc/cron.d`, user crontabs and the daily, weekly and monthly folders) and its systemd timers with their last and next run. Cron does not record when a job last ran, so only timers show that. Commands are shortened and values that look like passwords or tokens are hidden. Nothing is changed.
+- **Git.** The agent reports whether Git is installed and its version, and the web app can install it from your distribution's packages. A Git that is already on the server is left exactly as it is.
+- **The server's timezone** is part of what the agent reports.
+
+**Fixed**
+- A container is no longer labelled as infrastructure just because its image name contains something like `nginx` or `redis`.
+- Enabling automatic updates reports correctly that it installed the package, instead of saying it was already on.
+
 ## 0.1.13
 
 **New**
