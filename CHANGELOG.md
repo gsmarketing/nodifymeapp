@@ -2,6 +2,12 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.15
+
+**New**
+- **Websites.** A built site (a Next.js static export, a Vite or Astro project, plain HTML) can be served straight by this server's nginx, with no Docker. You build it, put it somewhere the server can download over HTTPS, and give Nodify.Me the address and the file's SHA-256 checksum. The agent downloads it, refuses it unless the checksum matches, looks inside it before anything changes (no links, no files outside the site, no `index.html` missing, size limits), and unpacks it as a new release. The live site switches over in one step, so visitors never see a half-updated site, and the last five releases are kept so you can go back to an earlier one. If nginx rejects the setup, the site stays on the version it had. A domain, HTTPS with a free Let's Encrypt certificate, and a single-page-app fallback are set per site. Nothing is built on the server.
+- **Node.js for websites.** The agent can install the supported long-term-support versions of Node.js (Active and Maintenance) side by side from nodejs.org, one folder per version, and update or remove them. Every download is checked against Node's own release signature and checksum before anything is installed, and only the `node` program is kept. Versions that no longer get security fixes, older versions, and short-lived "Current" releases are refused. The server's own Node, if any, is never used or changed. The agent now also reports which of these versions are installed.
+
 ## 0.1.14
 
 **New**
