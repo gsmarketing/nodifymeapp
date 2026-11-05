@@ -2,6 +2,15 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.16
+
+**New**
+- **Load, CPU cores and swap.** The agent now reports the server's 5-minute load average, how many CPU cores it has, and how much swap is in use. The web app uses them to judge load against the number of cores and to warn when a server is steadily short of memory. Where the load figure can't be read, it is left out rather than reported as zero.
+
+**Fixed**
+- **Readings saved during a connection outage.** When the agent could not reach Nodify.Me for a while, the readings it saved and sent afterwards were missing the load, cores and swap figures. They now arrive complete.
+- **A server that was removed.** If a server is deleted in the web app, or its agent is revoked, the agent used to keep asking every half hour. It now checks once a day and picks up again by itself if the server is added back.
+
 ## 0.1.15
 
 **New**

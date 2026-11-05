@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-AGENT_VERSION="v0.1.15"
+AGENT_VERSION="v0.1.16"
 API_URL="${API_URL:-}"
 AGENT_TOKEN="${AGENT_TOKEN:-}"
 INSTALL_DIR="/usr/local/bin"
@@ -648,7 +648,7 @@ main() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         --version)
-            AGENT_VERSION="v0.1.15"
+            AGENT_VERSION="v0.1.16"
             shift 2
             ;;
         --api-url)
