@@ -2,6 +2,14 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.17
+
+**Changed**
+- **New release signing key.** Releases are now signed with a new key that is kept off the source repository and protected by a passphrase. The agent and the installer check updates against the matching new public key, so every download is still verified before it is installed.
+
+**Action needed on existing installs**
+- An agent older than 0.1.17 only trusts the previous key, so it will not accept this release or later ones by itself. Re-run the installer once on each server (see the README); after that, updates continue automatically as before.
+
 ## 0.1.16
 
 **New**
