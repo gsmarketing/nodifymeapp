@@ -2,6 +2,14 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.2.0
+
+**Changed**
+- **Built with a current version of Go.** The agent moves from Go 1.21, which no longer receives security fixes, to Go 1.27. This brings in fixes for the networking, TLS and certificate handling the agent uses to talk to Nodify.Me and to check updates.
+- **Updated libraries.** The WebSocket, networking and system-information libraries are on their latest releases. Nothing changes in how the agent behaves or what it reports.
+
+**No action needed.** Servers on 0.1.17 or later update by themselves.
+
 ## 0.1.18
 
 **New**
