@@ -2,6 +2,16 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.1.18
+
+**New**
+- **An app's environment variables now live only on your server.** Each app keeps them in its own file, readable only by root, instead of inside the generated compose file. Nodify.Me sees the names of the variables but never keeps the values.
+- **Change an app's environment variables from the app page.** The app is restarted with the new values. If it does not stay up, the previous values are put back automatically and you are told why.
+
+**Needs Docker Compose 2.30 or later** to keep the variables in their own file. On an older Compose the agent keeps the previous layout and says so; updating Docker Compose on the server fixes it.
+
+**Existing apps** move to the new layout the next time you deploy them from Nodify.Me.
+
 ## 0.1.17
 
 **Changed**
