@@ -14,7 +14,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-AGENT_VERSION="v0.2.0"
+AGENT_VERSION="v0.2.1"
 API_URL="${API_URL:-}"
 AGENT_TOKEN="${AGENT_TOKEN:-}"
 INSTALL_DIR="/usr/local/bin"
@@ -461,7 +461,11 @@ SyslogIdentifier=nodifyme-helper
 # friends) are decided per real action once those exist.
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectHome=true
+# Home folders are visible and writable: SSH hardening writes a public key into
+# authorized_keys and creates a sudo user's home. (ProtectHome=read-only with
+# ReadWritePaths= does not reopen /root and /home, tested on Ubuntu 24.04, so the
+# protection has to be off for this unit; the helper still runs only compiled-in actions.)
+ProtectHome=no
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
@@ -471,6 +475,10 @@ EOF
 
     systemctl daemon-reload
     systemctl enable --now nodifyme-helper.socket
+    # A running helper keeps the sandbox it started with (the agent's monitoring calls keep it
+    # alive), so a changed unit only takes effect after a restart. The socket stays up and the
+    # next call starts it again.
+    systemctl try-restart nodifyme-helper.service 2>/dev/null || true
 
     print_success "Privileged helper socket installed"
 }
@@ -648,7 +656,7 @@ main() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         --version)
-            AGENT_VERSION="v0.2.0"
+            AGENT_VERSION="v0.2.1"
             shift 2
             ;;
         --api-url)

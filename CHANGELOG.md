@@ -2,6 +2,26 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.2.1
+
+**New**
+- **SSH hardening.** See how SSH sign-in is set up on the server, then change it from Nodify.Me: key-only sign-in for root, turning root sign-in off in favour of a sudo account, and the SSH port. Every change undoes itself after five minutes unless you confirm that you can still sign in, so a mistake cannot lock you out.
+- **Journal.** How much space the system log uses, its recent warnings and errors, and a size limit you can set.
+- **Disk usage.** Where the space went, by folder, with the usual suspects (logs, package cache, Docker) listed first, and clean-ups for the package cache and unused Docker images. Names and sizes only: file contents are never read.
+- **Server details and updates.** Pending updates, with installing security updates, all updates or a single package; restarting at a time you choose when an update needs it; hostname and timezone. It never does a release upgrade and never removes packages.
+- **Scheduled tasks.** Lists the cron jobs and timers already on the server (read-only), and lets you add tasks that call a URL on a schedule, with every run recorded.
+- **Server check-up.** Open ports, failed services and out-of-memory stops in one read.
+- **What is using it?** A snapshot of CPU, memory and disk activity per container and service.
+
+**Fixed**
+- **Firewall state** is now read from the firewall's own configuration file, which is more reliable than asking the firewall tool.
+- **Turning the firewall on.** If the SSH rule cannot be confirmed, the firewall is switched off again. If that also fails, the message now says so instead of saying nothing is blocking you.
+- **Busy helper.** A second action started while one is running now waits briefly instead of failing at once.
+
+**Action needed for SSH hardening**
+- Servers on 0.1.17 or later update by themselves, and everything above except SSH hardening works straight away. SSH hardening needs the updated service settings that only the installer writes: re-run the installer once on the server (see the README) before using it.
+- An agent older than 0.1.17 does not accept this release by itself (see 0.1.17): re-run the installer.
+
 ## 0.2.0
 
 **Changed**
