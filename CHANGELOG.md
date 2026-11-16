@@ -2,6 +2,15 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.3.0
+
+**Changed**
+- **Less network traffic.** The agent now sends one combined report each cycle instead of several separate requests, and repeats the server software and container details only when they change (plus a full refresh every six hours as a safety net). The information shown is the same; there are fewer and smaller requests, which matters most on small plans and metered servers.
+- **Container changes show up sooner.** A container that starts, stops or restarts shows at your plan's next report instead of up to 15 minutes later.
+
+**Fixed**
+- **History keeps the server's uptime.** Stored history points now carry it too.
+
 ## 0.2.1
 
 **New**
