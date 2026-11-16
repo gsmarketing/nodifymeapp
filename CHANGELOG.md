@@ -2,6 +2,13 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.3.1
+
+**Fixed**
+- **Recovers by itself after a long outage.** If Nodify.Me could not be reached for more than about 30 minutes, the agent could stop trying until the service was restarted. It now keeps trying at a gentle pace and reconnects on its own as soon as Nodify.Me is back.
+
+**No action needed.** Servers on 0.1.17 or later update by themselves.
+
 ## 0.3.0
 
 **Changed**
