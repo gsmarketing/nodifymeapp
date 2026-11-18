@@ -14,9 +14,10 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-AGENT_VERSION="v0.3.1"
+AGENT_VERSION="v0.4.0"
 API_URL="${API_URL:-}"
 AGENT_TOKEN="${AGENT_TOKEN:-}"
+ENROLL_TOKEN="${ENROLL_TOKEN:-}"
 INSTALL_DIR="/usr/local/bin"
 SERVICE_NAME="nodifyme-agent"
 USER_NAME="nodifyme"
@@ -219,9 +220,20 @@ create_directories() {
 
 # Function to validate required parameters
 validate_parameters() {
+    if [[ -n "$ENROLL_TOKEN" ]]; then
+        # The install command carries a single-use enrolment token; the agent's own token is
+        # issued by enroll_agent below and never appears in the command.
+        if [[ ! "$ENROLL_TOKEN" =~ ^nme-enroll-[A-Za-z0-9_-]{20,200}$ ]]; then
+            print_error "The enrolment token is not valid. Copy the install command again from the server page."
+            exit 1
+        fi
+        print_success "Parameters validated successfully"
+        return
+    fi
+
     if [[ -z "$AGENT_TOKEN" ]]; then
-        print_error "AGENT_TOKEN is required but not provided"
-        print_error "Use --token TOKEN or set AGENT_TOKEN environment variable"
+        print_error "An enrolment token is required but not provided"
+        print_error "Use --enroll-token TOKEN (from the install command on the server page)"
         exit 1
     fi
     
@@ -231,6 +243,41 @@ validate_parameters() {
     fi
     
     print_success "Parameters validated successfully"
+}
+
+# Trade the single-use enrolment token for this agent's own token. The token works once, so this
+# runs only after everything that can fail early (system checks, the download) has passed.
+enroll_agent() {
+    if [[ -z "$ENROLL_TOKEN" ]]; then
+        return 0
+    fi
+    print_status "Registering this server with Nodify.Me..."
+
+    local reply code json
+    # A server created by Nodify.Me boots before Nodify.Me knows its address: answer 409 means
+    # "not registered yet", so wait up to 20 minutes before giving up.
+    for _ in $(seq 1 120); do
+        if ! reply=$(curl -sS -m 30 -w '\n%{http_code}' -H 'Content-Type: application/json' \
+            -d "{\"token\":\"${ENROLL_TOKEN}\"}" "${API_URL%/}/api/v1/agent-enrollment" 2>&1); then
+            print_error "Could not reach Nodify.Me at ${API_URL}: ${reply}"
+            exit 1
+        fi
+        code=$(printf '%s\n' "$reply" | tail -n 1)
+        json=$(printf '%s\n' "$reply" | sed '$d')
+        [[ "$code" == "409" ]] || break
+        sleep 10
+    done
+    if [[ "$code" != "200" ]]; then
+        print_error "Nodify.Me did not accept this install command. It works once and for one hour: copy a new one from the server page."
+        exit 1
+    fi
+    AGENT_TOKEN=$(printf '%s' "$json" | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    ENROLL_TOKEN=""
+    if [[ ${#AGENT_TOKEN} -lt 16 ]]; then
+        print_error "Nodify.Me answered without a usable token. Copy a new install command from the server page."
+        exit 1
+    fi
+    print_success "Server registered"
 }
 
 # Function to create agent environment file
@@ -617,6 +664,9 @@ main() {
     # Download agent
     download_agent
     
+    # Trade the enrolment token for the agent's own (after the checks and download that can fail)
+    enroll_agent
+
     # Install agent
     install_agent
     
@@ -656,14 +706,19 @@ main() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         --version)
-            AGENT_VERSION="v0.3.1"
+            AGENT_VERSION="v0.4.0"
             shift 2
             ;;
         --api-url)
             API_URL="$2"
             shift 2
             ;;
+        --enroll-token)
+            ENROLL_TOKEN="$2"
+            shift 2
+            ;;
         --token)
+            # Older install commands; new ones carry --enroll-token
             AGENT_TOKEN="$2"
             shift 2
             ;;
@@ -673,16 +728,17 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --version VERSION    Specify agent version (default: latest)"
             echo "  --api-url URL        Set API URL (required)"
-            echo "  --token TOKEN        Set agent token (required, min 16 chars)"
+            echo "  --enroll-token TOKEN Single-use token from the install command (required)"
+            echo "  --token TOKEN        Agent token (older install commands)"
             echo "  --help               Show this help message"
             echo
             echo "Environment Variables:"
             echo "  AGENT_VERSION        Agent version to install"
             echo "  API_URL              API URL for the agent"
-            echo "  AGENT_TOKEN          Authentication token (required)"
+            echo "  ENROLL_TOKEN         Single-use enrolment token (required)"
             echo
             echo "Example:"
-            echo "  sudo $0 --api-url https://app.nodifyme.com --token eyJ0eXAiOiJKV1Q..."
+            echo "  sudo $0 --api-url https://app.nodifyme.com --enroll-token nme-enroll-..."
             exit 0
             ;;
         *)

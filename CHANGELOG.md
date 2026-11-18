@@ -2,6 +2,14 @@
 
 User-facing notes for each release. This file is copied to the public repository and its newest section becomes the GitHub release notes (see `scripts/agent/`), so write for someone who installs the agent, and keep internals out. Newest first. Each release is a `## X.Y.Z` heading.
 
+## 0.4.0
+
+**New**
+- **Apps made of several containers.** An App can now be a Docker Compose file, for example a website, its API and its database. Each service can be started, stopped, restarted and its logs read on its own, and only the services you mark as public are reachable from outside the server. Before anything starts, the file is checked and anything that would hand a container control of the server is refused.
+- **Servers Nodify.Me creates for you.** The install script now waits for Nodify.Me to register a newly created server, and uses a one-time install token, so the permanent agent token never appears in the install command.
+
+**No action needed.** Servers on 0.1.17 or later update by themselves.
+
 ## 0.3.1
 
 **Fixed**
